@@ -50,7 +50,19 @@ docker compose --profile public up -d --force-recreate nginx
 
 실제 도메인에서 HTTPS 접속, 회원 로그인, 예약, 차량 이미지 업로드를 점검한다. 이어서 `docker compose restart` 후에도 DB 데이터와 업로드 이미지가 남는지 확인한다.
 
-## 5. 운영
+## 5. 배포 후 스모크 테스트
+
+새 이미지를 EC2에 배포한 뒤, 외부 사용자가 접근하는 공개 URL로 `/health`를 확인한다.
+
+```bash
+APP_BASE_URL=http://<EC2_PUBLIC_IP> ./deploy/smoke-test.sh
+```
+
+HTTPS를 적용한 뒤에는 `APP_BASE_URL=https://<DOMAIN>`으로 실행한다. 이 스크립트는 HTTP 상태가 `200`이고 본문이 정확히 `OK`일 때만 성공한다. 앱 시작과 MySQL 준비를 기다릴 수 있도록 기본 12회, 5초 간격으로 재시도한다.
+
+`127.0.0.1:8080` 대신 공개 URL을 넣어야 Nginx를 포함한 외부 접속 경로까지 검증한다. GitHub Actions의 **Deployment smoke test** 워크플로도 같은 스크립트를 실행하며, Actions 탭에서 **Run workflow**를 눌러 공개 URL을 입력하면 된다.
+
+## 6. 운영
 
 MySQL과 업로드 파일은 Docker 볼륨에 보관된다. DB 백업과 복구 테스트를 정기적으로 수행한다. 인증서 갱신은 만료 전에 아래를 실행하고 Nginx를 다시 읽힌다.
 
