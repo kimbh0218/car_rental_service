@@ -21,6 +21,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -259,6 +260,53 @@ class RentalServiceIntegrationTest {
         assertEquals(new RentalState("RESERVED", false, false), findRentalState(rentalId));
     }
 
+    @Test
+    void cancelReservationChangesReservedRentalWithoutMovingCarOrParkingLot() throws SQLException {
+        long memberId = insertMember(true);
+        long parkingLotId = insertParkingLot();
+        long carId = insertCar(parkingLotId);
+        long rentalId = insertReservedRental(
+                memberId,
+                carId,
+                parkingLotId,
+                LocalDateTime.now().plusDays(1),
+                LocalDateTime.now().plusDays(1).plusHours(1)
+        );
+
+        Rental canceledRental = rentalService.cancelReservation(rentalId, memberId);
+
+        assertEquals(RentalStatus.CANCELED, canceledRental.getRentalStatus());
+        assertEquals(new RentalState("CANCELED", false, false), findRentalState(rentalId));
+        assertEquals(new CarState("AVAILABLE", parkingLotId), findCarState(carId));
+        assertEquals(new ParkingLotState(1, 0), findParkingLotState(parkingLotId));
+    }
+
+    @Test
+    void cancelReservationRejectsEveryNonReservedState() throws SQLException {
+        for (RentalStatus status : List.of(
+                RentalStatus.IN_PROGRESS,
+                RentalStatus.COMPLETED,
+                RentalStatus.CANCELED,
+                RentalStatus.NO_SHOW
+        )) {
+            clearDatabase();
+            long memberId = insertMember(true);
+            long parkingLotId = insertParkingLot();
+            long carId = insertCar(parkingLotId);
+            long rentalId = insertReservedRental(
+                    memberId,
+                    carId,
+                    parkingLotId,
+                    LocalDateTime.now().plusDays(1),
+                    LocalDateTime.now().plusDays(1).plusHours(1)
+            );
+            updateRentalStatus(rentalId, status);
+
+            assertThrows(IllegalStateException.class, () -> rentalService.cancelReservation(rentalId, memberId));
+            assertEquals(status.name(), findRentalState(rentalId).status());
+        }
+    }
+
     private void clearDatabase() throws SQLException {
         try (Connection connection = openConnection(); Statement statement = connection.createStatement()) {
             statement.execute("SET FOREIGN_KEY_CHECKS = 0");
@@ -402,6 +450,17 @@ class RentalServiceIntegrationTest {
                         resultSet.getTimestamp("actual_return_time") != null
                 );
             }
+        }
+    }
+
+    private void updateRentalStatus(long rentalId, RentalStatus status) throws SQLException {
+        try (Connection connection = openConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "UPDATE rental SET rental_status = ? WHERE id = ?"
+             )) {
+            statement.setString(1, status.name());
+            statement.setLong(2, rentalId);
+            statement.executeUpdate();
         }
     }
 
