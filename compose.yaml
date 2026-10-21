@@ -1,0 +1,96 @@
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    command: ["mysqld", "--innodb-buffer-pool-size=128M", "--max-connections=30", "--performance-schema=OFF"]
+    mem_limit: 384m
+    environment:
+      MYSQL_DATABASE: car_rental_jdbc
+      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./sql/000_initial_schema.sql:/docker-entrypoint-initdb.d/000_initial_schema.sql:ro
+    expose:
+      - "3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - private
+
+  app:
+    build:
+      context: .
+    restart: unless-stopped
+    mem_limit: 384m
+    environment:
+      DB_URL: jdbc:mysql://db:3306/car_rental_jdbc?serverTimezone=Asia%2FSeoul&characterEncoding=UTF-8
+      DB_USERNAME: ${MYSQL_USER:?Set MYSQL_USER in .env}
+      DB_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      IMAGE_STORAGE_TYPE: local
+      CAR_IMAGE_UPLOAD_DIR: /var/lib/car-rental/uploads
+      JAVA_OPTS: -Xms64m -Xmx256m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC
+    volumes:
+      - car_uploads:/var/lib/car-rental/uploads
+    ports:
+      - "127.0.0.1:8080:8080"
+    expose:
+      - "8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --show-error http://127.0.0.1:8080/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    networks:
+      - private
+
+  nginx:
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    mem_limit: 64m
+    profiles: ["public"]
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env}
+      NGINX_ENVSUBST_FILTER: APP_DOMAIN
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/${NGINX_CONFIG:?Set NGINX_CONFIG in .env}:/etc/nginx/templates/default.conf.template:ro
+      - certbot_conf:/etc/letsencrypt:ro
+      - certbot_www:/var/www/certbot:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - private
+
+  certbot:
+    image: certbot/certbot:latest
+    profiles: ["certbot"]
+    volumes:
+      - certbot_conf:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+
+volumes:
+  mysql_data:
+  car_uploads:
+  certbot_conf:
+  certbot_www:
+
+networks:
+  private:
