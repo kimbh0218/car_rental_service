@@ -197,6 +197,68 @@ class RentalServiceIntegrationTest {
         }
     }
 
+    @Test
+    void startRentalRejectsReservationOwnedByAnotherMember() throws SQLException {
+        long ownerId = insertMember(true);
+        long otherMemberId = insertMember(true);
+        long parkingLotId = insertParkingLot();
+        long carId = insertCar(parkingLotId);
+        long rentalId = insertReservedRental(
+                ownerId,
+                carId,
+                parkingLotId,
+                LocalDateTime.now().minusMinutes(1),
+                LocalDateTime.now().plusHours(1)
+        );
+
+        assertThrows(IllegalStateException.class, () -> rentalService.startRental(rentalId, otherMemberId));
+
+        assertEquals(new RentalState("RESERVED", false, false), findRentalState(rentalId));
+        assertEquals(new CarState("AVAILABLE", parkingLotId), findCarState(carId));
+        assertEquals(new ParkingLotState(1, 0), findParkingLotState(parkingLotId));
+    }
+
+    @Test
+    void returnCarRejectsRentalOwnedByAnotherMember() throws SQLException {
+        long ownerId = insertMember(true);
+        long otherMemberId = insertMember(true);
+        long parkingLotId = insertParkingLot();
+        long carId = insertCar(parkingLotId);
+        long rentalId = insertReservedRental(
+                ownerId,
+                carId,
+                parkingLotId,
+                LocalDateTime.now().minusMinutes(1),
+                LocalDateTime.now().plusHours(1)
+        );
+        rentalService.startRental(rentalId, ownerId);
+
+        assertThrows(IllegalStateException.class, () -> rentalService.returnCar(rentalId, otherMemberId));
+
+        assertEquals(new RentalState("IN_PROGRESS", true, false), findRentalState(rentalId));
+        assertEquals(new CarState("RENTED", null), findCarState(carId));
+        assertEquals(new ParkingLotState(0, 1), findParkingLotState(parkingLotId));
+    }
+
+    @Test
+    void cancelReservationRejectsReservationOwnedByAnotherMember() throws SQLException {
+        long ownerId = insertMember(true);
+        long otherMemberId = insertMember(true);
+        long parkingLotId = insertParkingLot();
+        long carId = insertCar(parkingLotId);
+        long rentalId = insertReservedRental(
+                ownerId,
+                carId,
+                parkingLotId,
+                LocalDateTime.now().plusDays(1),
+                LocalDateTime.now().plusDays(1).plusHours(1)
+        );
+
+        assertThrows(IllegalStateException.class, () -> rentalService.cancelReservation(rentalId, otherMemberId));
+
+        assertEquals(new RentalState("RESERVED", false, false), findRentalState(rentalId));
+    }
+
     private void clearDatabase() throws SQLException {
         try (Connection connection = openConnection(); Statement statement = connection.createStatement()) {
             statement.execute("SET FOREIGN_KEY_CHECKS = 0");
