@@ -1,7 +1,8 @@
 package org.example.service;
 
-import org.example.dao.MemberDao;
 import org.example.dao.DuplicateLoginIdException;
+import org.example.dao.MemberDao;
+import org.example.dao.MemberRepository;
 import org.example.domain.Member;
 import org.example.domain.MemberAuth;
 import org.example.security.PasswordHasher;
@@ -11,11 +12,15 @@ import java.util.Locale;
 
 public class MemberService {
 
-    private final MemberDao memberDao;
+    private final MemberRepository memberRepository;
     private final PasswordHasher passwordHasher;
 
     public MemberService(MemberDao memberDao, PasswordHasher passwordHasher) {
-        this.memberDao = memberDao;
+        this((MemberRepository) memberDao, passwordHasher);
+    }
+
+    MemberService(MemberRepository memberRepository, PasswordHasher passwordHasher) {
+        this.memberRepository = memberRepository;
         this.passwordHasher = passwordHasher;
     }
 
@@ -23,7 +28,7 @@ public class MemberService {
         String normalizedName = validateAndNormalizeName(name);
         String normalizedLoginId = validateAndNormalizeLoginId(loginId);
 
-        if (memberDao.findAuthByLoginId(normalizedLoginId).isPresent()) {
+        if (memberRepository.findAuthByLoginId(normalizedLoginId).isPresent()) {
             throw new IllegalArgumentException("이미 사용 중인 로그인 ID입니다.");
         }
 
@@ -31,7 +36,7 @@ public class MemberService {
         String passwordHash = passwordHasher.hash(rawPassword);
 
         try {
-            return memberDao.save(member, passwordHash);
+            return memberRepository.save(member, passwordHash);
         } catch (DuplicateLoginIdException e) {
             throw new IllegalArgumentException("이미 사용 중인 로그인 ID입니다.", e);
         }
@@ -43,7 +48,7 @@ public class MemberService {
             throw invalidCredentials();
         }
 
-        MemberAuth memberAuth = memberDao.findAuthByLoginId(normalizedLoginId)
+        MemberAuth memberAuth = memberRepository.findAuthByLoginId(normalizedLoginId)
                 .orElseThrow(() -> new IllegalArgumentException("로그인 ID 또는 비밀번호가 올바르지 않습니다."));
 
         if (!passwordHasher.matches(rawPassword, memberAuth.getPasswordHash())) {
@@ -51,14 +56,14 @@ public class MemberService {
         }
 
         if (passwordHasher.needsRehash(memberAuth.getPasswordHash())) {
-            memberDao.updatePasswordHash(memberAuth.getMember().getId(), passwordHasher.hash(rawPassword));
+            memberRepository.updatePasswordHash(memberAuth.getMember().getId(), passwordHasher.hash(rawPassword));
         }
 
         return memberAuth.getMember();
     }
 
     public List<Member> findAllMembers() {
-        return memberDao.findAll();
+        return memberRepository.findAll();
     }
 
     public Member findMemberById(long memberId) {
@@ -66,7 +71,7 @@ public class MemberService {
             throw new IllegalArgumentException("회원 ID는 양수여야 합니다.");
         }
 
-        return memberDao.findById(memberId)
+        return memberRepository.findById(memberId)
                 .orElseThrow(() ->
                         new IllegalArgumentException("존재하지 않는 회원입니다.")
                 );
@@ -77,7 +82,7 @@ public class MemberService {
             throw new IllegalArgumentException("회원 ID는 양수여야 합니다.");
         }
 
-        if (memberDao.updateLicenseStatus(memberId, true) != 1) {
+        if (memberRepository.updateLicenseStatus(memberId, true) != 1) {
             throw new IllegalArgumentException("존재하지 않는 회원입니다.");
         }
     }

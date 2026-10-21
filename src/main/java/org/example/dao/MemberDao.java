@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class MemberDao {
+public class MemberDao implements MemberRepository {
 
     public List<Member> findAll() {
         String sql = """

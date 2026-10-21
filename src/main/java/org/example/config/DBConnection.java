@@ -36,7 +36,10 @@ public class DBConnection {
     }
 
     private static String setting(String environmentVariable, String fallback) {
-        String value = System.getenv(environmentVariable);
+        String value = System.getProperty(environmentVariable);
+        if (value == null || value.isBlank()) {
+            value = System.getenv(environmentVariable);
+        }
         return value == null || value.isBlank() ? fallback : value;
     }
 
