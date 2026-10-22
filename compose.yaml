@@ -24,6 +24,9 @@ services:
       - private
 
   app:
+    # Local runs build this tag. Production injects a GHCR image and immutable SHA
+    # through .deploy.env, then starts with --no-build.
+    image: ${APP_IMAGE:-car-rental-app}:${APP_IMAGE_TAG:-local}
     build:
       context: .
     restart: unless-stopped

@@ -72,3 +72,9 @@ docker compose exec nginx nginx -s reload
 ```
 
 현재 앱은 Tomcat 메모리 세션과 앱 내부 스케줄러를 사용한다. 따라서 첫 운영 버전은 `app` 서비스를 한 개만 실행해야 한다.
+
+## 7. 승인 기반 자동 배포
+
+비공개 GHCR 이미지, GitHub `production` 승인, AWS SSM을 사용하는 자동 배포 설정은 [deploy/CD_SETUP.md](deploy/CD_SETUP.md)에 정리되어 있다.
+
+이 자동화는 검증된 앱 이미지만 EC2에서 교체한다. MySQL, Nginx, Docker 볼륨, DB 스키마 변경은 별도 운영 절차로 관리한다.
