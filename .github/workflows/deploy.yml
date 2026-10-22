@@ -33,24 +33,6 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
-      # Temporary: shows only non-secret OIDC claims so the IAM trust condition
-      # can be compared with the subject GitHub actually sends to AWS.
-      - name: Diagnose OIDC claims
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const token = await core.getIDToken('sts.amazonaws.com');
-            const claims = JSON.parse(
-              Buffer.from(token.split('.')[1], 'base64url').toString('utf8')
-            );
-            core.info(JSON.stringify({
-              aud: claims.aud,
-              sub: claims.sub,
-              repository: claims.repository,
-              ref: claims.ref,
-              environment: claims.environment
-            }));
-
       - name: Configure AWS credentials through OIDC
         uses: aws-actions/configure-aws-credentials@v5
         with:
