@@ -23,6 +23,28 @@ CREATE TABLE `admin` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `parking_lot`
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `parking_lot` (
+  `parking_lot_id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `max_parking_count` int NOT NULL,
+  `current_parking_count` int NOT NULL DEFAULT '0',
+  `address` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `rented_car_count` int NOT NULL DEFAULT '0',
+  `parking_lot_status` enum('ACTIVE','INACTIVE') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ACTIVE',
+  PRIMARY KEY (`parking_lot_id`),
+  UNIQUE KEY `uk_parking_lot_name_address` (`name`,`address`),
+  CONSTRAINT `chk_parking_capacity` CHECK (((`current_parking_count` >= 0) and (`rented_car_count` >= 0) and ((`current_parking_count` + `rented_car_count`) <= `max_parking_count`))),
+  CONSTRAINT `chk_parking_count` CHECK (((`current_parking_count` >= 0) and (`current_parking_count` <= `max_parking_count`))),
+  CONSTRAINT `chk_parking_max_count` CHECK ((`max_parking_count` > 0))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `car`
 --
 
@@ -84,28 +106,6 @@ CREATE TABLE `member` (
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_member_login_id` (`login_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `parking_lot`
---
-
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `parking_lot` (
-  `parking_lot_id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `max_parking_count` int NOT NULL,
-  `current_parking_count` int NOT NULL DEFAULT '0',
-  `address` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `rented_car_count` int NOT NULL DEFAULT '0',
-  `parking_lot_status` enum('ACTIVE','INACTIVE') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ACTIVE',
-  PRIMARY KEY (`parking_lot_id`),
-  UNIQUE KEY `uk_parking_lot_name_address` (`name`,`address`),
-  CONSTRAINT `chk_parking_capacity` CHECK (((`current_parking_count` >= 0) and (`rented_car_count` >= 0) and ((`current_parking_count` + `rented_car_count`) <= `max_parking_count`))),
-  CONSTRAINT `chk_parking_count` CHECK (((`current_parking_count` >= 0) and (`current_parking_count` <= `max_parking_count`))),
-  CONSTRAINT `chk_parking_max_count` CHECK ((`max_parking_count` > 0))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
