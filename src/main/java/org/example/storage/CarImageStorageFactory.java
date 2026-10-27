@@ -12,6 +12,9 @@ public final class CarImageStorageFactory {
                 || "local".equalsIgnoreCase(storageType)) {
             return LocalCarImageStorage.fromEnvironment();
         }
+        if ("s3".equalsIgnoreCase(storageType)) {
+            return S3CarImageStorage.fromEnvironment();
+        }
 
         throw new IllegalStateException(
                 "지원하지 않는 이미지 저장소 유형입니다: " + storageType
