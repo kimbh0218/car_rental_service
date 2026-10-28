@@ -37,8 +37,7 @@ services:
       DB_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
       IMAGE_STORAGE_TYPE: ${IMAGE_STORAGE_TYPE:-local}
       CAR_IMAGE_UPLOAD_DIR: /var/lib/car-rental/uploads
-      S3_BUCKET: ${S3_BUCKET:-}
-      AWS_REGION: ${AWS_REGION:-ap-northeast-2}
+      GCS_BUCKET: ${GCS_BUCKET:-}
       JAVA_OPTS: -Xms64m -Xmx256m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC
     volumes:
       - car_uploads:/var/lib/car-rental/uploads
