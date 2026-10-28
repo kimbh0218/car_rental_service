@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-# Runs on EC2 through AWS SSM. It deliberately replaces only the app service:
+# Runs on the deployment VM. It deliberately replaces only the app service:
 # MySQL, Nginx, and their persistent volumes stay running.
 set -Eeuo pipefail
 
-PROJECT_DIR="${PROJECT_DIR:-/home/ubuntu/car_rental}"
-# EC2 authenticates to this private package once through deploy/login-ghcr.sh.
+PROJECT_DIR="${PROJECT_DIR:-$HOME/car_rental}"
+# The deployment VM authenticates to this private package once through deploy/login-ghcr.sh.
 IMAGE_REPOSITORY="${IMAGE_REPOSITORY:-ghcr.io/kimbh0218/car_rental_service}"
 IMAGE_TAG="${1:-}"
 DEPLOY_ENV="$PROJECT_DIR/.deploy.env"

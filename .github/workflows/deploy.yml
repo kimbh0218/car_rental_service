@@ -9,7 +9,7 @@ permissions:
   contents: read
   id-token: write
 
-# Never run two app replacements on the same EC2 instance at once. A newer
+# Never run two app replacements on the same VM at once. A newer
 # deployment waits for an approved/running deployment instead of interrupting it.
 concurrency:
   group: production-deployment
@@ -33,76 +33,50 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
-      - name: Configure AWS credentials through OIDC
-        uses: aws-actions/configure-aws-credentials@v5
+      - name: Authenticate to Google Cloud through OIDC
+        uses: google-github-actions/auth@v3
         with:
-          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ vars.AWS_REGION }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
 
-      - name: Send app deployment command through SSM
-        id: ssm
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Deploy the approved image to the VM
         env:
-          EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          GCP_INSTANCE_NAME: ${{ vars.GCP_INSTANCE_NAME }}
+          GCP_APP_USER: ${{ vars.GCP_APP_USER }}
           IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -Eeuo pipefail
-          : "${EC2_INSTANCE_ID:?Set the production EC2_INSTANCE_ID environment variable.}"
+          : "${GCP_PROJECT_ID:?Set the production GCP_PROJECT_ID environment variable.}"
+          : "${GCP_INSTANCE_NAME:?Set the production GCP_INSTANCE_NAME environment variable.}"
+          : "${GCP_APP_USER:?Set the production GCP_APP_USER environment variable.}"
           : "${IMAGE_TAG:?Missing image tag.}"
 
-          remote_command="sudo -u ubuntu -H /home/ubuntu/car_rental/deploy/deploy-app.sh $IMAGE_TAG"
-          command_id="$(aws ssm send-command \
-            --document-name AWS-RunShellScript \
-            --instance-ids "$EC2_INSTANCE_ID" \
-            --parameters "commands=$remote_command" \
-            --comment "car-rental deployment $IMAGE_TAG" \
-            --query 'Command.CommandId' \
-            --output text)"
-
-          echo "command_id=$command_id" >> "$GITHUB_OUTPUT"
-          echo "SSM command: $command_id"
-
-          for attempt in {1..90}; do
-            status="$(aws ssm get-command-invocation \
-              --command-id "$command_id" \
-              --instance-id "$EC2_INSTANCE_ID" \
-              --query 'Status' \
-              --output text 2>/dev/null || true)"
-
-            case "$status" in
-              Success)
-                echo "Remote deployment succeeded."
-                break
-                ;;
-              Failed|Cancelled|TimedOut|Cancelling)
-                aws ssm get-command-invocation \
-                  --command-id "$command_id" \
-                  --instance-id "$EC2_INSTANCE_ID" \
-                  --output json || true
-                echo "Remote deployment ended with: $status" >&2
-                exit 1
-                ;;
-              *)
-                echo "Waiting for SSM command ($attempt/90): ${status:-not-visible-yet}"
-                sleep 4
-                ;;
-            esac
-          done
-
-          if [[ "${status:-}" != "Success" ]]; then
-            echo "Timed out waiting for the SSM command." >&2
+          if [[ ! "$GCP_APP_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+            echo "GCP_APP_USER contains unsupported characters." >&2
             exit 1
           fi
 
-      - name: Show remote deployment output when a failure occurs
-        if: failure() && steps.ssm.outputs.command_id != ''
-        env:
-          EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
-          COMMAND_ID: ${{ steps.ssm.outputs.command_id }}
-        run: |
-          aws ssm get-command-invocation \
-            --command-id "$COMMAND_ID" \
-            --instance-id "$EC2_INSTANCE_ID" \
-            --output json || true
+          zone="$(gcloud compute instances list \
+            --project "$GCP_PROJECT_ID" \
+            --filter="name=$GCP_INSTANCE_NAME" \
+            --format='value(zone)' | sed -n '1{s#.*/##;p;}')"
+          if [[ -z "$zone" ]]; then
+            echo "Could not find VM: $GCP_INSTANCE_NAME" >&2
+            exit 1
+          fi
+
+          project_dir="/home/$GCP_APP_USER/car_rental"
+          remote_command="sudo -u $GCP_APP_USER -H env PROJECT_DIR=$project_dir $project_dir/deploy/deploy-app.sh $IMAGE_TAG"
+          gcloud compute ssh "$GCP_INSTANCE_NAME" \
+            --project "$GCP_PROJECT_ID" \
+            --zone "$zone" \
+            --command "$remote_command" \
+            --quiet
 
       - name: Verify the public health endpoint
         env:

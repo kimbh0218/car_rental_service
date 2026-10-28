@@ -4,5 +4,6 @@ build
 .vscode
 .git
 .env
+gha-creds-*.json
 .DS_Store
 *.iml
