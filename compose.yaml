@@ -77,7 +77,8 @@ services:
       app:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/health"]
+      # HTTPS 환경에서는 80 포트가 리다이렉트하므로, private 네트워크의 앱 상태를 직접 확인한다.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://app:8080/health"]
       interval: 30s
       timeout: 5s
       retries: 3
