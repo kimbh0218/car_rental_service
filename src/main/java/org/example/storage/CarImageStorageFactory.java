@@ -12,8 +12,8 @@ public final class CarImageStorageFactory {
                 || "local".equalsIgnoreCase(storageType)) {
             return LocalCarImageStorage.fromEnvironment();
         }
-        if ("s3".equalsIgnoreCase(storageType)) {
-            return S3CarImageStorage.fromEnvironment();
+        if ("gcs".equalsIgnoreCase(storageType)) {
+            return GcsCarImageStorage.fromEnvironment();
         }
 
         throw new IllegalStateException(
